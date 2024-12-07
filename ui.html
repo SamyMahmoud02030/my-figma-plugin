@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Font Replacement Tool</title>
+  <link rel="stylesheet" href="/path/to/local/figma-plugin-ds.css">
+  <link rel="stylesheet" href="c/style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js"></script>
+  <style>
+    html {
+      background-color: white;
+    }
+
+    body {
+      font-family: 'ABeeZee', sans-serif;
+      padding: 20px;
+      background-color: #1E1E1E;
+      color: #E0E0E0;
+      margin: 0;
+    }
+
+    select, button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: none;
+    }
+
+    button {
+      background-color: #3b82f6;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #2563eb;
+      transition-delay: 250ms;
+    }
+
+    .selectedFont {
+      margin-top: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    #loading {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 1.2em;
+    }
+
+    .frame-container {
+      background: #2D2D2D;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .frame-container:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .frame-container h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      color: #3b82f6;
+      font-size: 1.2em;
+    }
+
+    #font-search:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .text-preview {
+      margin: 5px 0;
+      padding: 8px;
+      font-size: 16px;
+      min-height: 24px;
+      word-wrap: break-word;
+      background: #333;
+      border-radius: 4px;
+      border-left: 3px solid #3b82f6;
+      color: #E0E0E0;
+    }
+
+    
+    .text-checkbox {
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <h1>Fonts Replacement Tool</h1>
+      <p id="select-text-message"><i>Please, Select Text To Replace</i></p>
+    </header>
+    <aside>
+      <h2>Selected Fonts</h2>
+      <div id="text-container" class="selectedFont"></div>
+      <button id="show-text-button" style="display: none;">Show Text in Frame</button>
+    </aside>
+    <section>
+      <h2>Replace With...</h2>
+
+      <label for="weight-select">Select Font Weight:</label>
+      <select id="weight-select"></select>
+
+      <p>Fonts Families</p>
+      <input type="text" id="font-search" placeholder="Search fonts..." style="width: 100%; padding: 8px; margin-bottom: 10px; background: #2D2D2D; color: #E0E0E0; border: 1px solid #444; border-radius: 4px;">
+      <select id="fontSelect"></select>
+      <button id="replace-button" disabled>Replace Selected</button>
+      <button id="replace-all-button">Replace All Text on Page</button>
+    </section>
+    <div id="loading" style="display: none;">Loading fonts...</div>
+  </main>
+
+  <script>
+    let fontsData = []; // Store fonts data for later use
+
+    function populateFonts(fonts) {
+      const fontSelect = document.getElementById("fontSelect");
+      const weightSelect = document.getElementById("weight-select");
+
+      fontSelect.innerHTML = '';
+      weightSelect.innerHTML = '';
+
+      // Store fonts data for search functionality
+      fontsData = fonts;
+
+      // Sort fonts alphabetically
+      fonts.sort((a, b) => a.family.localeCompare(b.family));
+
+      fonts.forEach(font => {
+        if (font && font.family) {
+          const option = document.createElement("option");
+          option.value = font.family;
+          option.textContent = font.family;
+          option.style.fontFamily = font.family;
+          fontSelect.appendChild(option);
+        }
+      });
+
+      fontSelect.addEventListener("change", (e) => {
+        const selectedFontFamily = e.target.value;
+        updateWeightOptions(selectedFontFamily); // Update weight options based on selected font
+        toggleButtonState(); // Check button state after font selection
+      });
+
+      // Add search functionality
+      const searchInput = document.getElementById("font-search");
+      searchInput.addEventListener("input", (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        
+        // Clear the fontSelect and repopulate based on search
+        fontSelect.innerHTML = '';
+        fontsData.forEach(font => {
+          if (font.family.toLowerCase().includes(searchTerm)) {
+            const option = document.createElement("option");
+            option.value = font.family;
+            option.textContent = font.family;
+            option.style.fontFamily = font.family;
+            fontSelect.appendChild(option);
+          }
+        });
+
+        // If no options match, reset the selection
+        if (fontSelect.options.length === 0) {
+          const option = document.createElement("option");
+          option.value = '';
+          option.textContent = 'No matching fonts';
+          fontSelect.appendChild(option);
+        } else {
+          // Select the first matching option if the current selection is not visible
+          fontSelect.value = fontSelect.options[0].value;
+        }
+        
+        toggleButtonState(); // Update button state
+      });
+    }
+
+    // Function to update weight options based on selected font family
+    function updateWeightOptions(selectedFontFamily) {
+      const weightSelect = document.getElementById("weight-select");
+      weightSelect.innerHTML = ''; // Clear existing options
+
+      // Send a message to the plugin to check available weights for the selected font
+      parent.postMessage({ pluginMessage: { type: 'check-font-weights', family: selectedFontFamily } }, '*');
+    }
+
+    // Function to toggle button state based on selection
+    function toggleButtonState() {
+      const replaceButton = document.getElementById("replace-button");
+      const fontSelect = document.getElementById("fontSelect");
+      replaceButton.disabled = fontSelect.value === '' || fontSelect.value === 'No matching fonts';
+    }
+
+    // Add this event listener for the Replace Selected button
+    document.getElementById("replace-button").addEventListener("click", () => {
+      const fontSelect = document.getElementById("fontSelect");
+      const selectedFont = fontSelect.value;
+      const weightSelect = document.getElementById("weight-select");
+      const selectedWeight = weightSelect.value;
+
+      // Get all checked checkboxes
+      const checkedBoxes = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'));
+      const selectedNodes = checkedBoxes.map(checkbox => ({
+        id: checkbox.id,
+        font: selectedFont,
+        weight: selectedWeight
+      }));
+
+      // Send message to the plugin to replace fonts
+      if (selectedNodes.length > 0) {
+        parent.postMessage({ pluginMessage: { type: 'replace-font', font: selectedFont, weight: selectedWeight, selectedNodes } }, '*');
+      } else {
+        alert("Please select at least one text to replace.");
+      }
+    });
+
+    // Add this event listener for the Replace All Text on Page button
+    document.getElementById("replace-all-button").addEventListener("click", () => {
+      const fontSelect = document.getElementById("fontSelect");
+      const selectedFont = fontSelect.value;
+      const weightSelect = document.getElementById("weight-select");
+      const selectedWeight = weightSelect.value;
+
+      // Send message to the plugin to replace all fonts
+      if (selectedFont && selectedWeight) {
+        parent.postMessage({ pluginMessage: { type: 'replace-all-fonts', font: selectedFont, weight: selectedWeight } }, '*');
+      } else {
+        alert("Please select a font and weight before replacing all text.");
+      }
+    });
+
+    // Listen for messages from the plugin
+    onmessage = (event) => {
+      if (event.data.pluginMessage.type === 'populate-fonts') {
+        populateFonts(event.data.pluginMessage.fonts);
+      } else if (event.data.pluginMessage.type === 'update-selected-text') {
+        const textContainer = document.getElementById('text-container');
+        textContainer.innerHTML = event.data.pluginMessage.selectedTextsWithFonts.map(item => `
+          <div class="frame-container">
+            <h3>${item.frameName}</h3>
+            ${item.texts}
+          </div>
+        `).join('');
+      } else if (event.data.pluginMessage.type === 'update-message-visibility') {
+        const message = document.getElementById('select-text-message');
+        message.style.display = event.data.pluginMessage.showMessage ? 'block' : 'none';
+      } else if (event.data.pluginMessage.type === 'available-weights') {
+        const weightSelect = document.getElementById("weight-select");
+        weightSelect.innerHTML = ''; // Clear existing options
+
+        // Populate the weight select with available weights
+        event.data.pluginMessage.weights.forEach(weight => {
+          const option = document.createElement("option");
+          option.value = weight;
+          option.textContent = weight;
+          weightSelect.appendChild(option);
+        });
+      }
+    };
+  </script>
+</body>
+</html>
