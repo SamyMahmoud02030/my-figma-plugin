@@ -1,4 +1,4 @@
-// Constants and Types
+// Interfaces and Types
 interface TextNodeInfo {
   id: string;
   text: string;
@@ -92,15 +92,40 @@ function sendSelectedTextsToUI() {
 
   if (!showMessage) {
     const structuredData = Array.from(containersWithTexts.entries())
-      .map(([frameName, texts]) => ({
-        frameName,
-        texts: texts.map(textInfo => `
-          <div>
-            <input style="" type="checkbox" id="${textInfo.id}" value="${textInfo.id}" checked>
-            <span style="font-family: ${textInfo.font};">${textInfo.font}</span>
-          </div>
-        `).join('')
-      }))
+      .map(([frameName, texts]) => {
+        // Group texts by font family
+        const fontGroups = texts.reduce((acc, text) => {
+          if (!acc[text.font]) {
+            acc[text.font] = [];
+          }
+          acc[text.font].push(text);
+          return acc;
+        }, {} as Record<string, TextNodeInfo[]>);
+
+        // Create HTML for each font group
+        const groupedTexts = Object.entries(fontGroups).map(([fontFamily, textNodes]) => {
+          const checkboxes = textNodes.map(node => `
+            <div class="text-checkbox">
+              <input type="checkbox" id="${node.id}" value="${node.id}" checked>
+              <label for="${node.id}">${node.text}</label>
+            </div>
+          `).join('');
+
+          return `
+            <div class="font-group">
+              <h4 style="font-family: ${fontFamily}; margin: 10px 0;">
+                ${fontFamily} ${textNodes.length > 1 ? `(${textNodes.length} texts)` : ''}
+              </h4>
+              ${checkboxes}
+            </div>
+          `;
+        }).join('');
+
+        return {
+          frameName,
+          texts: groupedTexts
+        };
+      })
       .sort((a, b) => a.frameName.localeCompare(b.frameName));
 
     figma.ui.postMessage({
@@ -183,7 +208,3 @@ figma.ui.onmessage = async (msg) => {
 // Initialize: Send selected texts to UI when the plugin opens
 sendSelectedTextsToUI();
 listAvailableFonts(); // Fetch available fonts on startup
-
-
-
-

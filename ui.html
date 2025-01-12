@@ -79,7 +79,7 @@
       border-color: #3b82f6;
     }
 
-    .text-preview {
+    .text-previep {
       margin: 5px 0;
       padding: 8px;
       font-size: 16px;
@@ -102,7 +102,6 @@
   <main>
     <header>
       <h1>Fonts Replacement Tool</h1>
-      <p id="select-text-message"><i>Please, Select Text To Replace</i></p>
     </header>
     <aside>
       <h2>Selected Fonts</h2>
@@ -137,16 +136,22 @@
       // Store fonts data for search functionality
       fontsData = fonts;
 
+      // Use a Set to keep track of unique font families
+      const uniqueFonts = new Set();
+
       // Sort fonts alphabetically
       fonts.sort((a, b) => a.family.localeCompare(b.family));
 
       fonts.forEach(font => {
         if (font && font.family) {
-          const option = document.createElement("option");
-          option.value = font.family;
-          option.textContent = font.family;
-          option.style.fontFamily = font.family;
-          fontSelect.appendChild(option);
+          if (!uniqueFonts.has(font.family)) {
+            uniqueFonts.add(font.family); // Add to the set to ensure uniqueness
+            const option = document.createElement("option");
+            option.value = font.family;
+            option.textContent = font.family;
+            option.style.fontFamily = font.family;
+            fontSelect.appendChild(option);
+          }
         }
       });
 
@@ -163,12 +168,12 @@
         
         // Clear the fontSelect and repopulate based on search
         fontSelect.innerHTML = '';
-        fontsData.forEach(font => {
-          if (font.family.toLowerCase().includes(searchTerm)) {
+        uniqueFonts.forEach(fontFamily => {
+          if (fontFamily.toLowerCase().includes(searchTerm)) {
             const option = document.createElement("option");
-            option.value = font.family;
-            option.textContent = font.family;
-            option.style.fontFamily = font.family;
+            option.value = fontFamily;
+            option.textContent = fontFamily;
+            option.style.fontFamily = fontFamily;
             fontSelect.appendChild(option);
           }
         });
@@ -182,6 +187,7 @@
         } else {
           // Select the first matching option if the current selection is not visible
           fontSelect.value = fontSelect.options[0].value;
+          updateWeightOptions(fontSelect.value); // Update weights for the selected font
         }
         
         toggleButtonState(); // Update button state
@@ -255,8 +261,7 @@
           </div>
         `).join('');
       } else if (event.data.pluginMessage.type === 'update-message-visibility') {
-        const message = document.getElementById('select-text-message');
-        message.style.display = event.data.pluginMessage.showMessage ? 'block' : 'none';
+
       } else if (event.data.pluginMessage.type === 'available-weights') {
         const weightSelect = document.getElementById("weight-select");
         weightSelect.innerHTML = ''; // Clear existing options
@@ -273,3 +278,4 @@
   </script>
 </body>
 </html>
+<!-- 280 -->
